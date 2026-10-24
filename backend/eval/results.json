@@ -1,0 +1,632 @@
+[
+  {
+    "question": "When did Central Library open?",
+    "expected_pages": [
+      1
+    ],
+    "answerable": true,
+    "top_pages": [
+      6,
+      1,
+      1,
+      5,
+      7
+    ],
+    "top_score": 0.5462,
+    "rank": 2,
+    "status": "answered",
+    "answer": "Central Library opened in 1962 [S3].",
+    "cited_pages": [
+      1
+    ],
+    "citations_on_expected_page": true
+  },
+  {
+    "question": "Which branch opened most recently?",
+    "expected_pages": [
+      1
+    ],
+    "answerable": true,
+    "top_pages": [
+      1,
+      6,
+      1,
+      7,
+      3
+    ],
+    "top_score": 0.441,
+    "rank": 1,
+    "status": "answered",
+    "answer": "The Mill Creek branch is the newest, having opened in September 2019. [S1][S3]",
+    "cited_pages": [
+      1
+    ],
+    "citations_on_expected_page": true
+  },
+  {
+    "question": "How often does the Board of Trustees meet?",
+    "expected_pages": [
+      1
+    ],
+    "answerable": true,
+    "top_pages": [
+      1,
+      6,
+      3,
+      7,
+      5
+    ],
+    "top_score": 0.3045,
+    "rank": 1,
+    "status": "answered",
+    "answer": "The Board of Trustees meets on the second Tuesday of each month [S1].",
+    "cited_pages": [
+      1
+    ],
+    "citations_on_expected_page": true
+  },
+  {
+    "question": "What do I need to bring to get a library card?",
+    "expected_pages": [
+      2
+    ],
+    "answerable": true,
+    "top_pages": [
+      2,
+      7,
+      1,
+      3,
+      6
+    ],
+    "top_score": 0.5188,
+    "rank": 1,
+    "status": "answered",
+    "answer": "To obtain a library card, you must provide a photo ID and proof of a local address, such as a utility bill dated within the last 60 days [S1].",
+    "cited_pages": [
+      2
+    ],
+    "citations_on_expected_page": true
+  },
+  {
+    "question": "Can a 15-year-old sign up for a card without a parent?",
+    "expected_pages": [
+      2
+    ],
+    "answerable": true,
+    "top_pages": [
+      2,
+      7,
+      5,
+      4,
+      6
+    ],
+    "top_score": 0.577,
+    "rank": 1,
+    "status": "answered",
+    "answer": "Yes, teens aged 13 to 17 can sign up for a library card on their own by using a school ID [S1].",
+    "cited_pages": [
+      2
+    ],
+    "citations_on_expected_page": true
+  },
+  {
+    "question": "How much does a non-resident card cost?",
+    "expected_pages": [
+      2
+    ],
+    "answerable": true,
+    "top_pages": [
+      2,
+      5,
+      5,
+      4,
+      7
+    ],
+    "top_score": 0.4798,
+    "rank": 1,
+    "status": "answered",
+    "answer": "A non-resident library card costs $35 per year [S1].",
+    "cited_pages": [
+      2
+    ],
+    "citations_on_expected_page": true
+  },
+  {
+    "question": "How long can I borrow a DVD?",
+    "expected_pages": [
+      3
+    ],
+    "answerable": true,
+    "top_pages": [
+      3,
+      7,
+      4,
+      5,
+      2
+    ],
+    "top_score": 0.6909,
+    "rank": 1,
+    "status": "answered",
+    "answer": "DVDs and video games are loaned for 7 days [S1].",
+    "cited_pages": [
+      3
+    ],
+    "citations_on_expected_page": true
+  },
+  {
+    "question": "What is the maximum number of items I can check out?",
+    "expected_pages": [
+      3
+    ],
+    "answerable": true,
+    "top_pages": [
+      3,
+      4,
+      5,
+      7,
+      5
+    ],
+    "top_score": 0.334,
+    "rank": 1,
+    "status": "answered",
+    "answer": "You can have up to 30 items checked out at once, with a limit of no more than 10 DVDs [S1].",
+    "cited_pages": [
+      3
+    ],
+    "citations_on_expected_page": true
+  },
+  {
+    "question": "How many times can I renew a book?",
+    "expected_pages": [
+      3
+    ],
+    "answerable": true,
+    "top_pages": [
+      3,
+      7,
+      4,
+      5,
+      1
+    ],
+    "top_score": 0.6204,
+    "rank": 1,
+    "status": "answered",
+    "answer": "You can renew items up to two times, provided that no one else has placed a hold on them [S1].",
+    "cited_pages": [
+      3
+    ],
+    "citations_on_expected_page": true
+  },
+  {
+    "question": "How long is a hold kept for me?",
+    "expected_pages": [
+      3
+    ],
+    "answerable": true,
+    "top_pages": [
+      3,
+      7,
+      4,
+      6,
+      2
+    ],
+    "top_score": 0.4309,
+    "rank": 1,
+    "status": "answered",
+    "answer": "When an item you have placed on hold arrives, it is kept on the hold shelf for 5 days before it is passed on to the next person [S1].",
+    "cited_pages": [
+      3
+    ],
+    "citations_on_expected_page": true
+  },
+  {
+    "question": "Are there late fees for overdue books?",
+    "expected_pages": [
+      4
+    ],
+    "answerable": true,
+    "top_pages": [
+      4,
+      3,
+      7,
+      2,
+      5
+    ],
+    "top_score": 0.4858,
+    "rank": 1,
+    "status": "answered",
+    "answer": "No, Harbor City Public Library has been fine-free since March 2023 and does not charge daily fines for overdue items [S1].",
+    "cited_pages": [
+      4
+    ],
+    "citations_on_expected_page": true
+  },
+  {
+    "question": "When is an overdue item considered lost?",
+    "expected_pages": [
+      4
+    ],
+    "answerable": true,
+    "top_pages": [
+      4,
+      7,
+      3,
+      2,
+      6
+    ],
+    "top_score": 0.5819,
+    "rank": 1,
+    "status": "answered",
+    "answer": "An item is marked as lost when it is 45 days overdue [S1].",
+    "cited_pages": [
+      4
+    ],
+    "citations_on_expected_page": true
+  },
+  {
+    "question": "At what balance is my borrowing blocked?",
+    "expected_pages": [
+      4
+    ],
+    "answerable": true,
+    "top_pages": [
+      7,
+      3,
+      4,
+      6,
+      5
+    ],
+    "top_score": 0.342,
+    "rank": 3,
+    "status": "answered",
+    "answer": "Borrowing is paused when an account owes $25 or more in fees [S3].",
+    "cited_pages": [
+      4
+    ],
+    "citations_on_expected_page": true
+  },
+  {
+    "question": "What is the Wi-Fi network called?",
+    "expected_pages": [
+      5
+    ],
+    "answerable": true,
+    "top_pages": [
+      5,
+      1,
+      1,
+      6,
+      2
+    ],
+    "top_score": 0.1692,
+    "rank": 1,
+    "status": "answered",
+    "answer": "The Wi-Fi network available at every branch is named HCPL-Public [S1].",
+    "cited_pages": [
+      5
+    ],
+    "citations_on_expected_page": true
+  },
+  {
+    "question": "How much does color printing cost?",
+    "expected_pages": [
+      5
+    ],
+    "answerable": true,
+    "top_pages": [
+      5,
+      5,
+      2,
+      4,
+      3
+    ],
+    "top_score": 0.542,
+    "rank": 1,
+    "status": "answered",
+    "answer": "Color printing costs 50 cents per page [S2].",
+    "cited_pages": [
+      5
+    ],
+    "citations_on_expected_page": true
+  },
+  {
+    "question": "How far ahead can I book a study room?",
+    "expected_pages": [
+      5
+    ],
+    "answerable": true,
+    "top_pages": [
+      5,
+      3,
+      7,
+      1,
+      5
+    ],
+    "top_score": 0.5382,
+    "rank": 1,
+    "status": "answered",
+    "answer": "You can book a study room up to 14 days in advance [S1].",
+    "cited_pages": [
+      5
+    ],
+    "citations_on_expected_page": true
+  },
+  {
+    "question": "What do I need to do before using the 3D printer?",
+    "expected_pages": [
+      5
+    ],
+    "answerable": true,
+    "top_pages": [
+      5,
+      5,
+      2,
+      3,
+      7
+    ],
+    "top_score": 0.4463,
+    "rank": 1,
+    "status": "answered",
+    "answer": "Before using the 3D printers at the Central Library, members must complete a free 45-minute safety orientation [S1].",
+    "cited_pages": [
+      5
+    ],
+    "citations_on_expected_page": true
+  },
+  {
+    "question": "What time does Central Library open on Sunday?",
+    "expected_pages": [
+      6
+    ],
+    "answerable": true,
+    "top_pages": [
+      6,
+      1,
+      1,
+      5,
+      7
+    ],
+    "top_score": 0.6588,
+    "rank": 1,
+    "status": "answered",
+    "answer": "The Central Library opens at 1 p.m. on Sunday. [S1]",
+    "cited_pages": [
+      6
+    ],
+    "citations_on_expected_page": true
+  },
+  {
+    "question": "Are the smaller branches open on Mondays?",
+    "expected_pages": [
+      6
+    ],
+    "answerable": true,
+    "top_pages": [
+      6,
+      1,
+      1,
+      7,
+      3
+    ],
+    "top_score": 0.3838,
+    "rank": 1,
+    "status": "answered",
+    "answer": "No, the Northshore, Eastgate, and Mill Creek branches are closed on Mondays [S1].",
+    "cited_pages": [
+      6
+    ],
+    "citations_on_expected_page": true
+  },
+  {
+    "question": "What is the phone number for the information desk?",
+    "expected_pages": [
+      6
+    ],
+    "answerable": true,
+    "top_pages": [
+      5,
+      6,
+      7,
+      5,
+      2
+    ],
+    "top_score": 0.2638,
+    "rank": 2,
+    "status": "answered",
+    "answer": "The phone number for the Central Library information desk is (555) 010-4422 [S2].",
+    "cited_pages": [
+      6
+    ],
+    "citations_on_expected_page": true
+  },
+  {
+    "question": "Does the library keep a record of what I borrowed?",
+    "expected_pages": [
+      7
+    ],
+    "answerable": true,
+    "top_pages": [
+      7,
+      3,
+      4,
+      2,
+      1
+    ],
+    "top_score": 0.653,
+    "rank": 1,
+    "status": "answered",
+    "answer": "The library only keeps your borrowing history until an item is returned, unless you have enabled the optional reading-history feature in your account [S1].",
+    "cited_pages": [
+      7
+    ],
+    "citations_on_expected_page": true
+  },
+  {
+    "question": "Can I eat food in the library?",
+    "expected_pages": [
+      7
+    ],
+    "answerable": true,
+    "top_pages": [
+      7,
+      5,
+      2,
+      6,
+      3
+    ],
+    "top_score": 0.4487,
+    "rank": 1,
+    "status": "answered",
+    "answer": "Food is only permitted in the Central Library cafe and in study rooms [S1].",
+    "cited_pages": [
+      7
+    ],
+    "citations_on_expected_page": true
+  },
+  {
+    "question": "Who is the head librarian?",
+    "expected_pages": [],
+    "answerable": false,
+    "top_pages": [
+      1,
+      1,
+      5,
+      7,
+      6
+    ],
+    "top_score": 0.2734,
+    "rank": null,
+    "status": "abstained",
+    "answer": "The provided documents do not contain information regarding who the head librarian is.",
+    "cited_pages": [],
+    "citations_on_expected_page": false
+  },
+  {
+    "question": "What is the library's annual budget?",
+    "expected_pages": [],
+    "answerable": false,
+    "top_pages": [
+      3,
+      1,
+      5,
+      2,
+      6
+    ],
+    "top_score": 0.3722,
+    "rank": null,
+    "status": "abstained",
+    "answer": "The provided documents do not contain information regarding the library's annual budget.",
+    "cited_pages": [],
+    "citations_on_expected_page": false
+  },
+  {
+    "question": "Can I bring my pet dog into the library?",
+    "expected_pages": [],
+    "answerable": false,
+    "top_pages": [
+      7,
+      2,
+      3,
+      6,
+      4
+    ],
+    "top_score": 0.4428,
+    "rank": null,
+    "status": "answered",
+    "answer": "Service animals are welcome in all branches, but the document does not explicitly state that pets are allowed [S1].",
+    "cited_pages": [
+      7
+    ],
+    "citations_on_expected_page": false
+  },
+  {
+    "question": "Does the library offer passport services?",
+    "expected_pages": [],
+    "answerable": false,
+    "top_pages": [
+      2,
+      7,
+      1,
+      5,
+      1
+    ],
+    "top_score": 0.3802,
+    "rank": null,
+    "status": "abstained",
+    "answer": "The provided documents do not contain information regarding whether the library offers passport services.",
+    "cited_pages": [],
+    "citations_on_expected_page": false
+  },
+  {
+    "question": "What is the boiling point of mercury?",
+    "expected_pages": [],
+    "answerable": false,
+    "top_pages": [
+      6,
+      1,
+      5,
+      1,
+      7
+    ],
+    "top_score": 0.0704,
+    "rank": null,
+    "status": "abstained",
+    "answer": "I couldn't find anything in this document that answers that question. Try rephrasing it, or ask about a topic the document covers.",
+    "cited_pages": [],
+    "citations_on_expected_page": false
+  },
+  {
+    "question": "Who won the 2018 football World Cup?",
+    "expected_pages": [],
+    "answerable": false,
+    "top_pages": [
+      5,
+      1,
+      7,
+      5,
+      4
+    ],
+    "top_score": 0.0186,
+    "rank": null,
+    "status": "abstained",
+    "answer": "I couldn't find anything in this document that answers that question. Try rephrasing it, or ask about a topic the document covers.",
+    "cited_pages": [],
+    "citations_on_expected_page": false
+  },
+  {
+    "question": "How do I reset my router?",
+    "expected_pages": [],
+    "answerable": false,
+    "top_pages": [
+      6,
+      4,
+      5,
+      3,
+      2
+    ],
+    "top_score": 0.079,
+    "rank": null,
+    "status": "abstained",
+    "answer": "I couldn't find anything in this document that answers that question. Try rephrasing it, or ask about a topic the document covers.",
+    "cited_pages": [],
+    "citations_on_expected_page": false
+  },
+  {
+    "question": "What is the capital of Australia?",
+    "expected_pages": [],
+    "answerable": false,
+    "top_pages": [
+      1,
+      6,
+      1,
+      4,
+      7
+    ],
+    "top_score": 0.0541,
+    "rank": null,
+    "status": "abstained",
+    "answer": "I couldn't find anything in this document that answers that question. Try rephrasing it, or ask about a topic the document covers.",
+    "cited_pages": [],
+    "citations_on_expected_page": false
+  }
+]

@@ -1,0 +1,37 @@
+{
+  "document": "sample_data/harbor-city-library-handbook.pdf",
+  "notes": "Hand-written questions about the synthetic sample handbook. 'pages' lists the page(s) that contain the answer; an empty list means the document does not answer the question and the system should abstain.",
+  "questions": [
+    {"question": "When did Central Library open?", "pages": [1]},
+    {"question": "Which branch opened most recently?", "pages": [1]},
+    {"question": "How often does the Board of Trustees meet?", "pages": [1]},
+    {"question": "What do I need to bring to get a library card?", "pages": [2]},
+    {"question": "Can a 15-year-old sign up for a card without a parent?", "pages": [2]},
+    {"question": "How much does a non-resident card cost?", "pages": [2]},
+    {"question": "How long can I borrow a DVD?", "pages": [3]},
+    {"question": "What is the maximum number of items I can check out?", "pages": [3]},
+    {"question": "How many times can I renew a book?", "pages": [3]},
+    {"question": "How long is a hold kept for me?", "pages": [3]},
+    {"question": "Are there late fees for overdue books?", "pages": [4]},
+    {"question": "When is an overdue item considered lost?", "pages": [4]},
+    {"question": "At what balance is my borrowing blocked?", "pages": [4]},
+    {"question": "What is the Wi-Fi network called?", "pages": [5]},
+    {"question": "How much does color printing cost?", "pages": [5]},
+    {"question": "How far ahead can I book a study room?", "pages": [5]},
+    {"question": "What do I need to do before using the 3D printer?", "pages": [5]},
+    {"question": "What time does Central Library open on Sunday?", "pages": [6]},
+    {"question": "Are the smaller branches open on Mondays?", "pages": [6]},
+    {"question": "What is the phone number for the information desk?", "pages": [6]},
+    {"question": "Does the library keep a record of what I borrowed?", "pages": [7]},
+    {"question": "Can I eat food in the library?", "pages": [7]},
+
+    {"question": "Who is the head librarian?", "pages": []},
+    {"question": "What is the library's annual budget?", "pages": []},
+    {"question": "Can I bring my pet dog into the library?", "pages": []},
+    {"question": "Does the library offer passport services?", "pages": []},
+    {"question": "What is the boiling point of mercury?", "pages": []},
+    {"question": "Who won the 2018 football World Cup?", "pages": []},
+    {"question": "How do I reset my router?", "pages": []},
+    {"question": "What is the capital of Australia?", "pages": []}
+  ]
+}
