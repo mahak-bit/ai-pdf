@@ -88,6 +88,12 @@ def test_vercel_defaults(monkeypatch):
     assert _platform_defaults(Settings(_env_file=None)).max_upload_mb == 3
 
 
+def test_blob_enabled_by_store_id_or_token():
+    assert not Settings(_env_file=None).blob_enabled
+    assert Settings(_env_file=None, blob_store_id="store_abc").blob_enabled
+    assert Settings(_env_file=None, blob_read_write_token="vercel_blob_rw_x").blob_enabled
+
+
 def test_resolve_model_path_prefers_baked_copy(tmp_path):
     name = "sentence-transformers/all-MiniLM-L6-v2"
     assert resolve_model_path(name, tmp_path) == name

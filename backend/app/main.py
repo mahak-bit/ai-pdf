@@ -46,7 +46,7 @@ def create_app(
     settings = settings or get_settings()
     embedder = embedder or SentenceTransformerEmbedder(resolve_model_path(settings.embedding_model, MODELS_DIR))
     if mirror is _UNSET:
-        mirror = VercelBlobMirror(settings.blob_access) if settings.blob_read_write_token else None
+        mirror = VercelBlobMirror(settings.blob_access) if settings.blob_enabled else None
     llm_client: LLMClient | None = build_llm_client(settings) if llm is _UNSET else llm  # type: ignore[assignment]
 
     store = DocumentStore(

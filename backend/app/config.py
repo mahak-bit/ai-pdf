@@ -46,9 +46,16 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:3000"
 
-    # Vercel Blob mirror for documents (enabled when the token is present; see blob_mirror.py).
+    # Vercel Blob mirror for documents (see blob_mirror.py). Connecting a store to a project
+    # sets BLOB_STORE_ID (the SDK then authenticates with Vercel OIDC) or, for older stores,
+    # BLOB_READ_WRITE_TOKEN. Either one enables the mirror.
     blob_read_write_token: str | None = None
+    blob_store_id: str | None = None
     blob_access: Literal["private", "public"] = "private"
+
+    @property
+    def blob_enabled(self) -> bool:
+        return bool(self.blob_read_write_token or self.blob_store_id)
 
     @property
     def cors_origin_list(self) -> list[str]:
