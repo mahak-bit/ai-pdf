@@ -261,10 +261,19 @@ The frontend goes on Vercel. The backend needs a host with ~1 GB RAM for PyTorch
 
 ### 1. Backend on Hugging Face Spaces (free CPU tier)
 
-1. Create a Space at https://huggingface.co/new-space with **SDK: Docker** (blank template).
-2. Push the contents of `backend/` to the Space repo. The `Dockerfile` listens on port 7860, runs as uid 1000 and bakes the embedding model into the image.
-3. In **Settings → Variables and secrets**, add the secret `GEMINI_API_KEY`, and set `CORS_ORIGINS` to your Vercel URL (for example `https://documind.vercel.app`).
+Docker Spaces are listed under Hugging Face's paid plans, so this uses a **Gradio** Space (free CPU Basic: 2 vCPU, 16 GB RAM). `deploy/hf-space/space_app.py` serves the unchanged FastAPI app on port 7860, with a small Gradio status page at `/`.
+
+1. Create a Space at https://huggingface.co/new-space with **SDK: Gradio**, template **Blank**, hardware **CPU Basic (free)**, visibility **Public**.
+2. In **Settings → Variables and secrets**, add the secret `GEMINI_API_KEY`, the variable `GEMINI_MODEL=gemini-3.1-flash-lite`, and the variable `CORS_ORIGINS` set to your Vercel URL (for example `https://documind.vercel.app`).
+3. Assemble and push the Space (it needs a Hugging Face access token with write permission; git asks for it):
+   ```bash
+   git clone https://huggingface.co/spaces/<user>/<space> hf-space
+   sh deploy/hf-space/build.sh hf-space
+   cd hf-space && git add -A && git commit -m "Deploy DocuMind API" && git push
+   ```
 4. Once it's built, check `https://<user>-<space>.hf.space/api/health`.
+
+If you have a paid plan, `backend/Dockerfile` works as a Docker Space instead (port 7860, uid 1000, embedding model baked in).
 
 Free Spaces sleep after inactivity and have ephemeral disk, so uploaded documents disappear on restart. Attach persistent storage, or treat documents as session-scoped.
 
