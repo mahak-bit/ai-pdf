@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "python scripts/fetch_model.py || echo 'Model not baked; it will be downloaded on first use'",
+  "functions": {
+    "app/main.py": {
+      "maxDuration": 300,
+      "excludeFiles": "{tests/**,eval/**,data/**,.venv/**,.pytest_cache/**,**/__pycache__/**,Dockerfile,.env}"
+    }
+  }
+}

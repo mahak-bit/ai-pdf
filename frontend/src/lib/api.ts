@@ -39,6 +39,8 @@ export type Health = {
   embedding_model: string;
   embedding_model_loaded: boolean;
   documents: number;
+  max_upload_mb: number;
+  storage: "local" | "blob";
 };
 
 export class ApiError extends Error {
@@ -123,12 +125,13 @@ export const api = {
   },
 };
 
-export const MAX_UPLOAD_MB = 20;
+/** Used until /api/health reports the server's limit (4 MB on Vercel, 20 MB elsewhere). */
+export const DEFAULT_MAX_UPLOAD_MB = 20;
 
 /** Client-side checks mirror the server's, so obvious mistakes fail instantly. */
-export function checkFile(file: File): string | null {
+export function checkFile(file: File, maxMb: number = DEFAULT_MAX_UPLOAD_MB): string | null {
   if (!file.name.toLowerCase().endsWith(".pdf")) return "Only PDF files are supported. Choose a file ending in .pdf.";
   if (file.size === 0) return "That file is empty.";
-  if (file.size > MAX_UPLOAD_MB * 1024 * 1024) return `That file is larger than the ${MAX_UPLOAD_MB} MB limit.`;
+  if (file.size > maxMb * 1024 * 1024) return `That file is larger than the ${maxMb} MB limit.`;
   return null;
 }

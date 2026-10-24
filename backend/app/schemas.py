@@ -51,6 +51,8 @@ class HealthOut(BaseModel):
     embedding_model: str
     embedding_model_loaded: bool
     documents: int
+    max_upload_mb: int
+    storage: Literal["local", "blob"]
 
 
 class ErrorBody(BaseModel):

@@ -18,6 +18,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .blob_mirror import DocumentMirror
 from .chunker import Chunk, chunk_pages
 from .embeddings import Embedder
 from .errors import NotFound, UnprocessableDocument
@@ -25,6 +26,9 @@ from .pdf_parser import extract_pages
 from .vector_store import DocumentIndex
 
 log = logging.getLogger(__name__)
+
+# Upload order matters for mirrors: meta.json marks a document as complete.
+_FILES = ("source.pdf", "chunks.json", "index.faiss", "meta.json")
 
 
 @dataclass
@@ -47,12 +51,20 @@ class StoredDocument:
 
 
 class DocumentStore:
-    def __init__(self, root: Path, embedder: Embedder, chunk_max_chars: int, chunk_overlap_chars: int):
+    def __init__(
+        self,
+        root: Path,
+        embedder: Embedder,
+        chunk_max_chars: int,
+        chunk_overlap_chars: int,
+        mirror: DocumentMirror | None = None,
+    ):
         self.root = root / "documents"
         self.root.mkdir(parents=True, exist_ok=True)
         self.embedder = embedder
         self.chunk_max_chars = chunk_max_chars
         self.chunk_overlap_chars = chunk_overlap_chars
+        self.mirror = mirror
         self._docs: dict[str, StoredDocument] = {}
         self._lock = threading.Lock()
 
@@ -84,6 +96,9 @@ class DocumentStore:
             (folder / "chunks.json").write_text(json.dumps([c.to_dict() for c in chunks]), encoding="utf-8")
             index.save(folder / "index.faiss")
             (folder / "meta.json").write_text(json.dumps(asdict(meta), indent=2), encoding="utf-8")
+            if self.mirror:
+                # meta.json last: a document is only listed once all its files are stored.
+                self.mirror.upload(meta.doc_id, {n: (folder / n).read_bytes() for n in _FILES})
         except Exception:
             shutil.rmtree(folder, ignore_errors=True)
             raise
@@ -95,6 +110,13 @@ class DocumentStore:
 
     # ---- lookup ----------------------------------------------------------------------
 
+    @staticmethod
+    def _load_folder(folder: Path) -> StoredDocument:
+        meta = DocumentMeta(**json.loads((folder / "meta.json").read_text(encoding="utf-8")))
+        chunks = [Chunk(**c) for c in json.loads((folder / "chunks.json").read_text(encoding="utf-8"))]
+        index = DocumentIndex.load(folder / "index.faiss", chunks)
+        return StoredDocument(meta, index, folder / "source.pdf")
+
     def load_all(self) -> int:
         """Load previously ingested documents from disk. Skips (and logs) broken folders."""
         loaded = 0
@@ -102,31 +124,54 @@ class DocumentStore:
             if not folder.is_dir():
                 continue
             try:
-                meta = DocumentMeta(**json.loads((folder / "meta.json").read_text(encoding="utf-8")))
-                chunks = [Chunk(**c) for c in json.loads((folder / "chunks.json").read_text(encoding="utf-8"))]
-                index = DocumentIndex.load(folder / "index.faiss", chunks)
+                doc = self._load_folder(folder)
             except Exception:
                 log.exception("Skipping unreadable document folder %s", folder.name)
                 continue
             with self._lock:
-                self._docs[meta.doc_id] = StoredDocument(meta, index, folder / "source.pdf")
+                self._docs[doc.meta.doc_id] = doc
             loaded += 1
         return loaded
 
     def get(self, doc_id: str) -> StoredDocument:
         with self._lock:
             doc = self._docs.get(doc_id)
+        if doc is None and self.mirror:
+            doc = self._fetch_from_mirror(doc_id)
         if doc is None:
             raise NotFound("That document was not found. It may have been deleted; upload it again.")
         return doc
 
+    def _fetch_from_mirror(self, doc_id: str) -> StoredDocument | None:
+        folder = self.root / doc_id
+        try:
+            if not self.mirror.download(doc_id, folder):
+                return None
+            doc = self._load_folder(folder)
+        except Exception:
+            log.exception("Could not load document %s from the mirror", doc_id)
+            shutil.rmtree(folder, ignore_errors=True)
+            return None
+        with self._lock:
+            self._docs[doc_id] = doc
+        return doc
+
     def list(self) -> list[DocumentMeta]:
         with self._lock:
-            metas = [d.meta for d in self._docs.values()]
-        return sorted(metas, key=lambda m: m.created_at, reverse=True)
+            metas = {d.meta.doc_id: d.meta for d in self._docs.values()}
+        if self.mirror:
+            for doc_id, raw in self.mirror.read_meta_files().items():
+                if doc_id not in metas:
+                    try:
+                        metas[doc_id] = DocumentMeta(**json.loads(raw))
+                    except (ValueError, TypeError):
+                        log.warning("Ignoring malformed mirrored metadata for %s", doc_id)
+        return sorted(metas.values(), key=lambda m: m.created_at, reverse=True)
 
     def delete(self, doc_id: str) -> None:
         self.get(doc_id)
         with self._lock:
             self._docs.pop(doc_id, None)
+        if self.mirror:
+            self.mirror.delete(doc_id)
         shutil.rmtree(self.root / doc_id, ignore_errors=True)

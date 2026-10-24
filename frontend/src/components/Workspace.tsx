@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, ApiError, checkFile, type DocumentInfo, type Health, type Source } from "@/lib/api";
+import { api, ApiError, checkFile, DEFAULT_MAX_UPLOAD_MB, type DocumentInfo, type Health, type Source } from "@/lib/api";
 import { Composer } from "./Composer";
 import { AlertIcon, LogoMark, MenuIcon } from "./icons";
 import { Message, type Turn } from "./Message";
@@ -35,6 +35,7 @@ export function Workspace() {
   const activeDoc = documents.find((d) => d.doc_id === activeId) ?? null;
   const turns = activeId ? (threads[activeId] ?? []) : [];
   const asking = turns.some((t) => t.state === "pending");
+  const maxUploadMb = health?.max_upload_mb ?? DEFAULT_MAX_UPLOAD_MB;
 
   const connect = useCallback(async () => {
     setDocsLoading(true);
@@ -71,7 +72,7 @@ export function Workspace() {
   };
 
   const handleUpload = async (file: File) => {
-    const problem = checkFile(file);
+    const problem = checkFile(file, maxUploadMb);
     if (problem) return setUpload({ phase: "idle", error: problem });
     setUpload({ phase: "uploading", filename: file.name, progress: 0 });
     try {
@@ -199,7 +200,14 @@ export function Workspace() {
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
             {!activeDoc ? (
-              <Welcome upload={upload} onUpload={handleUpload} onSample={handleSample} sampleLoading={sampleLoading} disabled={serverDown} />
+              <Welcome
+                upload={upload}
+                onUpload={handleUpload}
+                onSample={handleSample}
+                sampleLoading={sampleLoading}
+                disabled={serverDown}
+                maxMb={maxUploadMb}
+              />
             ) : turns.length === 0 ? (
               <DocumentIntro doc={activeDoc} onAsk={ask} retrievalOnly={health?.llm_provider === "none"} />
             ) : (
@@ -255,12 +263,14 @@ function Welcome({
   onSample,
   sampleLoading,
   disabled,
+  maxMb,
 }: {
   upload: UploadState;
   onUpload: (f: File) => void;
   onSample: () => void;
   sampleLoading: boolean;
   disabled: boolean;
+  maxMb: number;
 }) {
   return (
     <section className="pt-6 sm:pt-12">
@@ -273,7 +283,7 @@ function Welcome({
       </p>
 
       <div className="mt-9">
-        <UploadDropzone state={upload} onFile={onUpload} />
+        <UploadDropzone state={upload} onFile={onUpload} maxMb={maxMb} />
       </div>
 
       <p className="mt-5 text-sm text-graphite">

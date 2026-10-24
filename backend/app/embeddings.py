@@ -1,9 +1,16 @@
 """Sentence embeddings. Vectors are L2-normalised so inner product equals cosine similarity."""
 
 import threading
+from pathlib import Path
 from typing import Protocol
 
 import numpy as np
+
+
+def resolve_model_path(model_name: str, models_dir: Path) -> str:
+    """Prefer a copy saved by scripts/fetch_model.py (baked into deployments) over the Hub."""
+    local = models_dir / model_name.rsplit("/", 1)[-1]
+    return str(local) if (local / "config.json").is_file() else model_name
 
 
 class Embedder(Protocol):

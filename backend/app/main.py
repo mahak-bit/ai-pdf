@@ -14,8 +14,9 @@ from fastapi.responses import JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .config import BACKEND_ROOT, Settings, get_settings
+from .blob_mirror import DocumentMirror, VercelBlobMirror
 from .document_store import DocumentStore
-from .embeddings import Embedder, SentenceTransformerEmbedder
+from .embeddings import Embedder, SentenceTransformerEmbedder, resolve_model_path
 from .errors import AppError, NotFound
 from .llm import LLMClient, build_llm_client
 from .page_render import render_page_png
@@ -26,6 +27,7 @@ from .schemas import AnswerOut, AskRequest, DocumentOut, ErrorOut, HealthOut
 log = logging.getLogger("documind")
 
 SAMPLE_PDF = BACKEND_ROOT / "sample_data" / "harbor-city-library-handbook.pdf"
+MODELS_DIR = BACKEND_ROOT / "models"
 DocId = Annotated[str, PathParam(pattern=r"^[0-9a-f]{12}$", description="Document id")]
 _UNSET = object()
 
@@ -39,12 +41,17 @@ def create_app(
     embedder: Embedder | None = None,
     llm: LLMClient | None | object = _UNSET,
     warm_embedder: bool = True,
+    mirror: DocumentMirror | None | object = _UNSET,
 ) -> FastAPI:
     settings = settings or get_settings()
-    embedder = embedder or SentenceTransformerEmbedder(settings.embedding_model)
+    embedder = embedder or SentenceTransformerEmbedder(resolve_model_path(settings.embedding_model, MODELS_DIR))
+    if mirror is _UNSET:
+        mirror = VercelBlobMirror(settings.blob_access) if settings.blob_read_write_token else None
     llm_client: LLMClient | None = build_llm_client(settings) if llm is _UNSET else llm  # type: ignore[assignment]
 
-    store = DocumentStore(settings.data_dir, embedder, settings.chunk_max_chars, settings.chunk_overlap_chars)
+    store = DocumentStore(
+        settings.data_dir, embedder, settings.chunk_max_chars, settings.chunk_overlap_chars, mirror=mirror  # type: ignore[arg-type]
+    )
     pipeline = RAGPipeline(embedder, llm_client, settings.top_k, settings.min_relevance)
 
     @asynccontextmanager
@@ -107,6 +114,8 @@ def create_app(
             embedding_model=settings.embedding_model,
             embedding_model_loaded=bool(getattr(embedder, "loaded", True)),
             documents=len(store.list()),
+            max_upload_mb=settings.max_upload_mb,
+            storage="blob" if store.mirror else "local",
         )
 
     @app.get("/api/documents", response_model=list[DocumentOut])

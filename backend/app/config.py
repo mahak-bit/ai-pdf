@@ -1,5 +1,6 @@
 """Runtime configuration, read from environment variables (and an optional .env file)."""
 
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -45,11 +46,29 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:3000"
 
+    # Vercel Blob mirror for documents (enabled when the token is present; see blob_mirror.py).
+    blob_read_write_token: str | None = None
+    blob_access: Literal["private", "public"] = "private"
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
 
+def _platform_defaults(settings: Settings) -> Settings:
+    """On Vercel only /tmp is writable and request bodies are capped at 4.5 MB."""
+    if not os.environ.get("VERCEL"):
+        return settings
+    # Hugging Face libraries write caches under HOME, which is read-only on Vercel.
+    os.environ.setdefault("HF_HOME", "/tmp/huggingface")
+    updates: dict = {}
+    if "DATA_DIR" not in os.environ:
+        updates["data_dir"] = Path("/tmp/documind")
+    if "MAX_UPLOAD_MB" not in os.environ:
+        updates["max_upload_mb"] = 4
+    return settings.model_copy(update=updates) if updates else settings
+
+
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    return _platform_defaults(Settings())

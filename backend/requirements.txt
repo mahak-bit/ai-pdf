@@ -1,6 +1,11 @@
-# Runtime dependencies (tested on Python 3.10, Windows 11 and in python:3.11-slim).
-# Install the CPU-only PyTorch build first to avoid a ~2 GB CUDA download:
-#   pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
+# Runtime dependencies. Python 3.12 is the deployment target (Vercel, CI);
+# local development also works on 3.10+.
+#
+# PyTorch (CPU only, avoiding a ~2 GB CUDA download):
+# - Linux + Python 3.12 (Vercel, CI): installed from the wheel URL below.
+# - Anywhere else, install it first:
+#     pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
+torch @ https://download.pytorch.org/whl/cpu/torch-2.14.1%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl ; sys_platform == "linux" and python_version == "3.12"
 fastapi==0.162.0
 uvicorn[standard]==0.54.0
 python-multipart==0.0.32
@@ -10,3 +15,4 @@ pymupdf==1.28.2
 numpy==2.2.6
 faiss-cpu==1.15.1
 sentence-transformers==6.2.0
+vercel==0.12.1

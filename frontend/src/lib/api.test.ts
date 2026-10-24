@@ -13,6 +13,11 @@ describe("checkFile", () => {
     expect(checkFile(file("empty.pdf", 0))).toMatch(/empty/);
     expect(checkFile(file("huge.pdf", 21 * 1024 * 1024))).toMatch(/20 MB/);
   });
+
+  it("uses the server's limit when given", () => {
+    expect(checkFile(file("doc.pdf", 5 * 1024 * 1024), 4)).toMatch(/4 MB/);
+    expect(checkFile(file("doc.pdf", 3 * 1024 * 1024), 4)).toBeNull();
+  });
 });
 
 describe("toApiError", () => {

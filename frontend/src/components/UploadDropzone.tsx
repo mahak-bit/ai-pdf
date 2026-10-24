@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { MAX_UPLOAD_MB } from "@/lib/api";
+import { DEFAULT_MAX_UPLOAD_MB } from "@/lib/api";
 import { UploadIcon } from "./icons";
 
 export type UploadState =
@@ -13,9 +13,10 @@ type Props = {
   state: UploadState;
   onFile: (file: File) => void;
   compact?: boolean;
+  maxMb?: number;
 };
 
-export function UploadDropzone({ state, onFile, compact = false }: Props) {
+export function UploadDropzone({ state, onFile, compact = false, maxMb = DEFAULT_MAX_UPLOAD_MB }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const busy = state.phase !== "idle";
@@ -62,7 +63,7 @@ export function UploadDropzone({ state, onFile, compact = false }: Props) {
               </span>
               {!compact && (
                 <span className="mt-1 block text-sm text-graphite">
-                  Text-based PDFs up to {MAX_UPLOAD_MB} MB. Scanned pages need OCR first.
+                  Text-based PDFs up to {maxMb} MB. Scanned pages need OCR first.
                 </span>
               )}
             </span>

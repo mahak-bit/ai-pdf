@@ -1,5 +1,5 @@
 # Backend image. Works on Hugging Face Spaces (Docker SDK, port 7860), Render, Fly.io, etc.
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -12,8 +12,8 @@ RUN useradd -m -u 1000 user
 WORKDIR /home/user/app
 
 COPY requirements.txt .
-RUN pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu \
- && pip install -r requirements.txt
+# On Linux + Python 3.12, requirements.txt installs the CPU-only torch wheel.
+RUN pip install -r requirements.txt
 
 USER user
 # Bake the embedding model into the image so cold starts don't download it.
