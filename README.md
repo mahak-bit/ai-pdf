@@ -4,7 +4,9 @@ Ask questions about a PDF and get answers grounded in its text, with every claim
 
 ![A Gemini answer citing page 4, the cited passage highlighted on the page, and a declined question the handbook doesn't answer](docs/screenshots/answer.png)
 
-**Stack:** Next.js 16 · TypeScript · Tailwind CSS 4 | FastAPI · PyMuPDF · sentence-transformers (all-MiniLM-L6-v2) · FAISS | Gemini API, with a local Ollama fallback
+**Live demo:** https://documind-ai-blush.vercel.app (select "Try the sample library handbook")
+
+**Stack:** Next.js 16 · TypeScript · Tailwind CSS 4 | FastAPI · PyMuPDF · sentence-transformers (all-MiniLM-L6-v2) · FAISS | Gemini API, with a local Ollama fallback | Vercel (frontend, Python function, Blob)
 
 ---
 
@@ -257,34 +259,36 @@ Correctness was reviewed by hand, not auto-scored.
 
 ## Deployment
 
-The frontend goes on Vercel. The backend needs a host with ~1 GB RAM for PyTorch and the embedding model, which rules out most 512 MB free tiers.
+Both halves run on Vercel's free Hobby plan as two projects linked to the same repository. Live: frontend https://documind-ai-blush.vercel.app, API https://documind-api-three.vercel.app/api/health.
 
-### 1. Backend on Hugging Face Spaces (free CPU tier)
+### 1. Backend on Vercel (Python function)
 
-Docker Spaces are listed under Hugging Face's paid plans, so this uses a **Gradio** Space (free CPU Basic: 2 vCPU, 16 GB RAM). `deploy/hf-space/space_app.py` serves the unchanged FastAPI app on port 7860, with a small Gradio status page at `/`.
+Vercel detects the FastAPI `app` in `backend/app/main.py`. `backend/vercel.json` bakes the embedding model into the build (`scripts/fetch_model.py`) and allows 300-second requests; `backend/.python-version` selects Python 3.12, and `requirements.txt` installs CPU-only PyTorch from a wheel URL on Linux.
 
-1. Create a Space at https://huggingface.co/new-space with **SDK: Gradio**, template **Blank**, hardware **CPU Basic (free)**, visibility **Public**.
-2. In **Settings → Variables and secrets**, add the secret `GEMINI_API_KEY`, the variable `GEMINI_MODEL=gemini-3.1-flash-lite`, and the variable `CORS_ORIGINS` set to your Vercel URL (for example `https://documind.vercel.app`).
-3. Assemble and push the Space (it needs a Hugging Face access token with write permission; git asks for it):
-   ```bash
-   git clone https://huggingface.co/spaces/<user>/<space> hf-space
-   sh deploy/hf-space/build.sh hf-space
-   cd hf-space && git add -A && git commit -m "Deploy DocuMind API" && git push
-   ```
-4. Once it's built, check `https://<user>-<space>.hf.space/api/health`.
+1. Create a project from the repository with **Root Directory** `backend`.
+2. Environment variables:
+   - `GEMINI_API_KEY` (mark **Sensitive**)
+   - `GEMINI_MODEL=gemini-3.1-flash-lite`
+   - `CORS_ORIGINS=https://<your-frontend>.vercel.app`
+   - `VERCEL_SUPPORT_LARGE_FUNCTIONS=1`: torch and sentence-transformers make a ~1.3 GB bundle, above the 500 MB standard limit; this enables large functions (up to 5 GB, beta)
+3. **Storage → Create → Blob**, access **Private**, connected to the project. This adds `BLOB_READ_WRITE_TOKEN`. Serverless instances don't share a disk, so each document's PDF, chunks, index and metadata are mirrored to Blob (`app/blob_mirror.py`), and any instance can load any document.
+4. Deploy, then check `/api/health`: it should report `"llm_provider": "gemini"` and `"storage": "blob"`.
 
-If you have a paid plan, `backend/Dockerfile` works as a Docker Space instead (port 7860, uid 1000, embedding model baked in).
+Platform limits that shape the design:
 
-Free Spaces sleep after inactivity and have ephemeral disk, so uploaded documents disappear on restart. Attach persistent storage, or treat documents as session-scoped.
+- **Upload size:** Vercel caps request bodies at 4.5 MB, so uploads are limited to 4 MB on Vercel (`MAX_UPLOAD_MB`). `/api/health` reports the limit and the frontend enforces it. Direct-to-Blob client uploads would lift this; it's listed under next steps.
+- **Cold starts:** the first request after a period of inactivity loads PyTorch and the model, which takes several seconds.
+- **Writable disk:** only `/tmp` is writable (`DATA_DIR` defaults to `/tmp/documind` on Vercel), and it is only a cache in front of Blob.
 
-Alternatives: Render, Railway or Fly.io with the same Dockerfile (set `PORT`; choose an instance with ≥ 1 GB RAM, which is usually paid), or any VM with `uvicorn app.main:app --host 0.0.0.0 --port 8000`.
+Other hosts: `backend/Dockerfile` (Python 3.12, port 7860, model baked in) runs on any container host with about 1 GB of RAM. Hugging Face now requires a paid plan for Docker and Gradio Spaces; `deploy/hf-space/` keeps a tested Gradio-Space entry point for accounts that have one.
 
 ### 2. Frontend on Vercel
 
-1. Import the repository in Vercel and set **Root Directory** to `frontend`.
-2. Add the environment variable `NEXT_PUBLIC_API_BASE_URL=https://<user>-<space>.hf.space`.
-3. Deploy. Because this value is inlined at build time, redeploy after changing it.
-4. Add the Vercel URL to the backend's `CORS_ORIGINS`.
+1. Create a second project from the same repository with **Root Directory** `frontend`.
+2. Set `NEXT_PUBLIC_API_BASE_URL=https://<your-backend>.vercel.app`. It is inlined at build time, so redeploy after changing it.
+3. Deploy.
+
+New Vercel projects may have **Deployment Protection** (Vercel Authentication) enabled. For a public demo, set it to cover preview deployments only, under **Settings → Deployment Protection**.
 
 ### Before you share the link
 
@@ -316,4 +320,5 @@ Intentionally out of scope for v1:
 - **No OCR.** Scanned PDFs are detected and rejected with guidance. Next step: optional `ocrmypdf`/Tesseract.
 - **Dense retrieval only.** Exact tokens (phone numbers, codes) are MiniLM's weak spot; 2 of the 3 hit@1 misses were of this kind. Next step: hybrid BM25 + dense retrieval with reciprocal-rank fusion, or a cross-encoder re-ranker.
 - **Synchronous ingestion.** Uploads are parsed and embedded inside the request, which is fine for a few hundred pages. Next step: a background job queue with progress reporting for large files.
-- **Not verified in this build:** the Docker image (Docker wasn't installed on the build machine), the Ollama path (not installed), and the Vercel/Spaces deployments. The Gemini path was verified live; the others are covered by mocked tests only.
+- **4 MB uploads on Vercel.** This is the platform's request-size cap. Next step: browser-to-Blob client uploads, with the API ingesting from the Blob URL.
+- **Not verified in this build:** the Docker image (Docker wasn't installed on the build machine) and the Ollama path (not installed); both are covered by mocked tests only. Gemini and the Vercel deployment were verified live.
