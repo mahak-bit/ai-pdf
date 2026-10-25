@@ -39,7 +39,7 @@ Ask questions about a PDF and get answers grounded in its text, with every claim
 | --- | --- | --- |
 | ![Welcome screen](docs/screenshots/welcome.png) | ![Abstained answer](docs/screenshots/abstained.png) | ![Mobile layout](docs/screenshots/mobile.png) |
 
-> The hero screenshot shows a live answer from `gemini-3.1-flash-lite`. The three above were captured in retrieval-only mode, before a key was configured.
+> The hero screenshot is from the live deployment (Vercel, `gemini-3.1-flash-lite`). The three above were captured locally in retrieval-only mode, before a key was configured.
 
 ## Architecture
 
