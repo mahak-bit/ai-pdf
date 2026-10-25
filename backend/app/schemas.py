@@ -1,6 +1,6 @@
 """Request and response models for the HTTP API."""
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -28,12 +28,24 @@ class AskRequest(BaseModel):
         return value
 
 
+class MultiAskRequest(AskRequest):
+    doc_ids: list[Annotated[str, Field(pattern=r"^[0-9a-f]{12}$")]] = Field(..., min_length=1, max_length=10)
+
+
+class FromBlobRequest(BaseModel):
+    # Only the upload folder the frontend's token route allows, with a UUID file name.
+    pathname: str = Field(..., pattern=r"^uploads/[0-9a-f-]{36}\.pdf$")
+    filename: str = Field(..., min_length=1, max_length=255)
+
+
 class SourceOut(BaseModel):
     source_id: str
     chunk_id: str
     page: int
     excerpt: str
     score: float
+    doc_id: str
+    filename: str
 
 
 class AnswerOut(BaseModel):
@@ -53,6 +65,7 @@ class HealthOut(BaseModel):
     documents: int
     max_upload_mb: int
     storage: Literal["local", "blob"]
+    direct_upload: bool
 
 
 class ErrorBody(BaseModel):

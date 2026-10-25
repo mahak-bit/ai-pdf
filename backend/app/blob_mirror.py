@@ -29,6 +29,12 @@ class DocumentMirror(Protocol):
 
     def delete(self, doc_id: str) -> None: ...
 
+    def read_upload(self, pathname: str) -> bytes:
+        """Bytes of a file the browser uploaded directly. Raises FileNotFoundError."""
+        ...
+
+    def delete_upload(self, pathname: str) -> None: ...
+
 
 class VercelBlobMirror:
     def __init__(self, access: str = "private"):
@@ -66,3 +72,15 @@ class VercelBlobMirror:
         paths = [item.pathname for item in self._blob.query_blobs(prefix=f"{PREFIX}{doc_id}/")]
         if paths:
             self._blob.delete_blob(paths)
+
+    def read_upload(self, pathname: str) -> bytes:
+        try:
+            return self._blob.get_blob(pathname, access=self.access).body
+        except self._blob.BlobNotFoundError as exc:
+            raise FileNotFoundError(pathname) from exc
+
+    def delete_upload(self, pathname: str) -> None:
+        try:
+            self._blob.delete_blob(pathname)
+        except Exception:  # cleanup is best effort; never mask the ingest result
+            log.warning("Could not delete temporary upload %s", pathname)

@@ -103,3 +103,70 @@ def test_provider_selection(monkeypatch):
 
     monkeypatch.setattr(OllamaClient, "is_available", lambda self: True)
     assert build_llm_client(Settings(_env_file=None, llm_provider="auto")).name == "ollama"
+
+
+def _ok(text: str) -> httpx.Response:
+    return _response(200, {"candidates": [{"content": {"parts": [{"text": text}]}}]})
+
+
+def test_gemini_falls_back_to_next_model_when_overloaded(monkeypatch):
+    monkeypatch.setattr("app.llm.time.sleep", lambda s: None)
+    calls: list[str] = []
+
+    def fake_post(url, **kwargs):
+        calls.append(url)
+        return _response(503, {"error": {"message": "overloaded"}}) if "primary" in url else _ok('{"ok": true}')
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    used: list[str] = []
+    client = GeminiClient("k", "primary", 5, fallback_models=("backup", "primary", ""))
+    assert client.models == ["primary", "backup"]
+    assert client.generate_json("s", "p", on_model=used.append) == '{"ok": true}'
+    assert used == ["backup"]
+    assert sum("primary" in c for c in calls) == 2  # retried once (a fallback exists), then fell back
+
+
+def test_gemini_does_not_fall_back_on_auth_errors(monkeypatch):
+    fake = _FakePost(_response(403, {"error": {"message": "forbidden"}}))
+    monkeypatch.setattr(httpx, "post", fake)
+    with pytest.raises(LLMError) as err:
+        GeminiClient("k", "primary", 5, fallback_models=("backup",)).generate_json("s", "p")
+    assert err.value.code == "llm_auth"
+    assert len(fake.calls) == 1
+
+
+class _FakeStream:
+    def __init__(self, status: int, lines: list[str]):
+        self.status_code, self._lines = status, lines
+        self.text = "{}"
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def read(self):
+        return b"{}"
+
+    def json(self):
+        return {}
+
+    def iter_lines(self):
+        return iter(self._lines)
+
+
+def test_gemini_stream_parses_sse_and_falls_back(monkeypatch):
+    monkeypatch.setattr("app.llm.time.sleep", lambda s: None)
+    chunk = lambda t: 'data: {"candidates": [{"content": {"parts": [{"text": "%s"}]}}]}' % t  # noqa: E731
+
+    def fake_stream(method, url, **kwargs):
+        if "primary" in url:
+            return _FakeStream(503, [])
+        return _FakeStream(200, [chunk("Hello "), "", chunk("world [S1].")])
+
+    monkeypatch.setattr(httpx, "stream", fake_stream)
+    used: list[str] = []
+    pieces = list(GeminiClient("k", "primary", 5, fallback_models=("backup",)).stream_text("s", "p", on_model=used.append))
+    assert pieces == ["Hello ", "world [S1]."]
+    assert used == ["backup"]

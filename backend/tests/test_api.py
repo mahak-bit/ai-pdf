@@ -175,3 +175,67 @@ def test_sample_document_loads_once(make_client):
     assert first.status_code == 201
     assert first.json()["doc_id"] == second.json()["doc_id"]
     assert first.json()["page_count"] == 7
+
+
+# ---- multiple documents and streaming -----------------------------------------------------
+
+
+def _parse_sse(text: str) -> list[tuple[str, dict]]:
+    import json
+
+    events = []
+    for block in text.strip().split("\n\n"):
+        lines = dict(line.split(": ", 1) for line in block.splitlines())
+        events.append((lines["event"], json.loads(lines["data"])))
+    return events
+
+
+ROWING = make_pdf(["The rowing club charges 90 dollars per year.", "Boats are kept in the boathouse by the river."])
+
+
+def test_ask_across_several_documents_names_each_source(make_client, handbook_pdf):
+    llm = ScriptedLLM({"answerable": True, "answer": "Cycling is 40 dollars [S1]; rowing is 90 [S2].", "citations": ["S1", "S2"]})
+    client = make_client(llm=llm, top_k=4, min_relevance=0.05)
+    cycling = _upload(client, handbook_pdf, name="cycling.pdf").json()["doc_id"]
+    rowing = _upload(client, ROWING, name="rowing.pdf").json()["doc_id"]
+
+    body = client.post("/api/ask", json={"doc_ids": [cycling, rowing], "question": "How much is yearly membership?"}).json()
+    assert body["status"] == "answered"
+    assert {s["filename"] for s in body["sources"]} <= {"cycling.pdf", "rowing.pdf"}
+    assert all(s["doc_id"] in (cycling, rowing) for s in body["sources"])
+    assert "cycling.pdf, page" in llm.prompts[0] and "rowing.pdf, page" in llm.prompts[0]
+
+
+def test_ask_validates_document_list(make_client, handbook_pdf):
+    client = make_client()
+    doc_id = _upload(client, handbook_pdf).json()["doc_id"]
+    assert client.post("/api/ask", json={"doc_ids": [], "question": "Hi?"}).status_code == 422
+    assert client.post("/api/ask", json={"doc_ids": ["nope"], "question": "Hi?"}).status_code == 422
+    assert client.post("/api/ask", json={"doc_ids": [doc_id, "0123456789ab"], "question": "Hi?"}).status_code == 404
+
+
+def test_stream_endpoint_sends_sources_tokens_and_final(make_client, handbook_pdf):
+    client = make_client(llm=ScriptedLLM("Helmets are mandatory on every ride [S1]."))
+    doc_id = _upload(client, handbook_pdf).json()["doc_id"]
+    response = client.post("/api/ask/stream", json={"doc_ids": [doc_id], "question": "Are helmets mandatory on rides?"})
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    events = _parse_sse(response.text)
+    kinds = [e for e, _ in events]
+    assert kinds[0] == "sources" and kinds[-1] == "final" and kinds.count("token") > 1
+    final = events[-1][1]
+    assert final["status"] == "answered"
+    assert final["sources"][0]["page"] == 3
+
+
+def test_stream_endpoint_reports_llm_failure_as_event(make_client, handbook_pdf):
+    client = make_client(llm=ScriptedLLM(LLMError("Gemini is overloaded right now.", code="llm_overloaded")))
+    doc_id = _upload(client, handbook_pdf).json()["doc_id"]
+    events = _parse_sse(client.post("/api/ask/stream", json={"doc_ids": [doc_id], "question": "When was the club founded?"}).text)
+    assert events[-1] == ("error", {"code": "llm_overloaded", "message": "Gemini is overloaded right now."})
+
+
+def test_stream_endpoint_unknown_document_is_plain_404(make_client):
+    response = make_client().post("/api/ask/stream", json={"doc_ids": ["0123456789ab"], "question": "Hi?"})
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"

@@ -1,5 +1,7 @@
 // Typed client for the DocuMind FastAPI backend. The browser talks to the backend
 // directly; no secrets live here (the Gemini key stays on the server).
+import { uploadPresigned } from "@vercel/blob/client";
+import { parseSSE } from "./sse";
 
 export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000").replace(/\/$/, "");
 
@@ -20,6 +22,8 @@ export type Source = {
   page: number;
   excerpt: string;
   score: number;
+  doc_id: string;
+  filename: string;
 };
 
 export type AnswerStatus = "answered" | "abstained" | "retrieval_only";
@@ -41,6 +45,14 @@ export type Health = {
   documents: number;
   max_upload_mb: number;
   storage: "local" | "blob";
+  /** True when PDFs go browser -> Blob storage directly (no 4.5 MB request cap). */
+  direct_upload: boolean;
+};
+
+export type StreamHandlers = {
+  /** Retrieved passages, before generation starts: lets citation chips render live. */
+  onSources?: (sources: Source[]) => void;
+  onToken?: (text: string) => void;
 };
 
 export class ApiError extends Error {
@@ -82,15 +94,77 @@ export const api = {
   listDocuments: () => request<DocumentInfo[]>("/api/documents"),
   loadSample: () => request<DocumentInfo>("/api/documents/sample", { method: "POST" }),
   deleteDocument: (docId: string) => request<void>(`/api/documents/${docId}`, { method: "DELETE" }),
-  ask: (docId: string, question: string, signal?: AbortSignal) =>
-    request<Answer>(`/api/documents/${docId}/ask`, {
+  ask: (docIds: string[], question: string, signal?: AbortSignal) =>
+    request<Answer>("/api/ask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({ doc_ids: docIds, question }),
       signal,
     }),
+
+  /**
+   * Ask with a streamed answer. Resolves with the server's final, validated answer,
+   * which is authoritative: it may remove citations or replace the draft entirely.
+   */
+  async askStream(docIds: string[], question: string, handlers: StreamHandlers, signal?: AbortSignal): Promise<Answer> {
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}/api/ask/stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doc_ids: docIds, question }),
+        signal,
+      });
+    } catch {
+      throw new ApiError(NETWORK_MESSAGE, "network_error", 0);
+    }
+    if (!response.ok || !response.body) throw await toApiError(response);
+
+    const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+    let buffer = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      const parsed = parseSSE(buffer + value);
+      buffer = parsed.rest;
+      for (const { event, data } of parsed.events) {
+        if (event === "sources") handlers.onSources?.((data as { sources: Source[] }).sources);
+        else if (event === "token") handlers.onToken?.((data as { text: string }).text);
+        else if (event === "final") return data as Answer;
+        else if (event === "error") {
+          const err = data as { code: string; message: string };
+          throw new ApiError(err.message, err.code, 502);
+        }
+      }
+    }
+    throw new ApiError("The answer stream ended unexpectedly. Try again.", "stream_interrupted", 0);
+  },
   pageImageUrl: (docId: string, page: number, chunkId?: string) =>
     `${API_BASE_URL}/api/documents/${docId}/pages/${page}${chunkId ? `?chunk_id=${encodeURIComponent(chunkId)}` : ""}`,
+
+  /**
+   * Large-file path: the browser uploads the PDF straight to Blob storage with a
+   * short-lived token from this site's /api/upload route, then the API ingests it.
+   */
+  async uploadDirect(file: File, onProgress?: (fraction: number) => void): Promise<DocumentInfo> {
+    const pathname = `uploads/${crypto.randomUUID()}.pdf`;
+    try {
+      await uploadPresigned(pathname, file, {
+        access: "private",
+        handleUploadUrl: "/api/upload",
+        contentType: "application/pdf",
+        multipart: file.size > 8 * 1024 * 1024,
+        onUploadProgress: ({ percentage }) => onProgress?.(percentage / 100),
+      });
+    } catch {
+      throw new ApiError("The file could not be uploaded to storage. Check your connection and try again.", "upload_failed", 0);
+    }
+    return request<DocumentInfo>("/api/documents/from-blob", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pathname, filename: file.name }),
+    });
+  },
 
   /** Upload with progress. XHR is used because fetch has no upload progress events. */
   uploadDocument(file: File, onProgress?: (fraction: number) => void): Promise<DocumentInfo> {

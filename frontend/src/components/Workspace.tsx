@@ -15,15 +15,18 @@ const SAMPLE_QUESTIONS = [
   "How far ahead can I book a study room?",
   "Who is the head librarian?",
 ];
+const MAX_SELECTED = 10;
 
 const message = (err: unknown) => (err instanceof ApiError ? err.message : "Something went wrong. Try again.");
+/** Conversations are kept per set of selected documents. */
+const threadKey = (ids: string[]) => [...ids].sort().join(",");
 
 export function Workspace() {
   const [health, setHealth] = useState<Health | null>(null);
   const [serverDown, setServerDown] = useState(false);
   const [documents, setDocuments] = useState<DocumentInfo[]>([]);
   const [docsLoading, setDocsLoading] = useState(true);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [threads, setThreads] = useState<Record<string, Turn[]>>({});
   const [openSource, setOpenSource] = useState<Source | null>(null);
   const [upload, setUpload] = useState<UploadState>({ phase: "idle" });
@@ -32,10 +35,15 @@ export function Workspace() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const scrollEnd = useRef<HTMLDivElement>(null);
 
-  const activeDoc = documents.find((d) => d.doc_id === activeId) ?? null;
-  const turns = activeId ? (threads[activeId] ?? []) : [];
+  const selectedDocs = documents.filter((d) => selectedIds.includes(d.doc_id));
+  const primaryDoc = selectedDocs[0] ?? null;
+  const multiDoc = selectedDocs.length > 1;
+  const key = threadKey(selectedDocs.map((d) => d.doc_id));
+  const turns = selectedDocs.length ? (threads[key] ?? []) : [];
   const asking = turns.some((t) => t.state === "pending");
+  const lastDraftLength = turns.at(-1)?.draft?.length ?? 0;
   const maxUploadMb = health?.max_upload_mb ?? DEFAULT_MAX_UPLOAD_MB;
+  const sourceDoc = openSource ? (documents.find((d) => d.doc_id === openSource.doc_id) ?? null) : null;
 
   const connect = useCallback(async () => {
     setDocsLoading(true);
@@ -44,7 +52,7 @@ export function Workspace() {
       setHealth(h);
       setServerDown(false);
       setDocuments(docs);
-      setActiveId((current) => current ?? docs[0]?.doc_id ?? null);
+      setSelectedIds((current) => (current.length ? current : docs[0] ? [docs[0].doc_id] : []));
     } catch {
       setServerDown(true);
     } finally {
@@ -54,32 +62,42 @@ export function Workspace() {
 
   useEffect(() => {
     // Initial load from the backend; state is set once the requests resolve.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void connect();
   }, [connect]);
 
   useEffect(() => {
     scrollEnd.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [turns.length, asking]);
+  }, [turns.length, asking, lastDraftLength]);
+
+  const selectOnly = (docId: string) => {
+    setSelectedIds([docId]);
+    setOpenSource(null);
+    setDrawerOpen(false);
+  };
+
+  const toggleSelected = (docId: string) => {
+    setSelectedIds((ids) => {
+      if (ids.includes(docId)) return ids.length > 1 ? ids.filter((id) => id !== docId) : ids;
+      return ids.length >= MAX_SELECTED ? ids : [...ids, docId];
+    });
+    setOpenSource(null);
+  };
 
   const addDocument = (doc: DocumentInfo) => {
     setDocuments((docs) => [doc, ...docs.filter((d) => d.doc_id !== doc.doc_id)]);
-    setActiveId(doc.doc_id);
-    setOpenSource(null);
-    setDrawerOpen(false);
     setServerDown(false);
     setUpload({ phase: "idle" });
+    selectOnly(doc.doc_id);
   };
 
   const handleUpload = async (file: File) => {
     const problem = checkFile(file, maxUploadMb);
     if (problem) return setUpload({ phase: "idle", error: problem });
     setUpload({ phase: "uploading", filename: file.name, progress: 0 });
+    const onProgress = (progress: number) =>
+      setUpload(progress >= 1 ? { phase: "indexing", filename: file.name } : { phase: "uploading", filename: file.name, progress });
     try {
-      const doc = await api.uploadDocument(file, (progress) =>
-        setUpload(progress >= 1 ? { phase: "indexing", filename: file.name } : { phase: "uploading", filename: file.name, progress }),
-      );
-      setUpload({ phase: "idle" });
+      const doc = health?.direct_upload ? await api.uploadDirect(file, onProgress) : await api.uploadDocument(file, onProgress);
       addDocument(doc);
     } catch (err) {
       setUpload({ phase: "idle", error: message(err) });
@@ -104,37 +122,43 @@ export function Workspace() {
     } catch (err) {
       if (!(err instanceof ApiError && err.status === 404)) return setNotice(message(err));
     }
-    setDocuments((docs) => docs.filter((d) => d.doc_id !== docId));
-    setThreads((all) => Object.fromEntries(Object.entries(all).filter(([id]) => id !== docId)));
-    if (docId === activeId) {
-      setActiveId(documents.find((d) => d.doc_id !== docId)?.doc_id ?? null);
-      setOpenSource(null);
-    }
+    const remaining = documents.filter((d) => d.doc_id !== docId);
+    setDocuments(remaining);
+    setThreads((all) => Object.fromEntries(Object.entries(all).filter(([k]) => !k.split(",").includes(docId))));
+    setSelectedIds((ids) => {
+      const next = ids.filter((id) => id !== docId);
+      return next.length ? next : remaining[0] ? [remaining[0].doc_id] : [];
+    });
+    if (openSource?.doc_id === docId) setOpenSource(null);
   };
 
-  const updateTurn = (docId: string, turnId: string, patch: Partial<Turn>) =>
-    setThreads((all) => ({ ...all, [docId]: (all[docId] ?? []).map((t) => (t.id === turnId ? { ...t, ...patch } : t)) }));
+  const updateTurn = (k: string, turnId: string, patch: (t: Turn) => Partial<Turn>) =>
+    setThreads((all) => ({ ...all, [k]: (all[k] ?? []).map((t) => (t.id === turnId ? { ...t, ...patch(t) } : t)) }));
 
-  const runQuestion = async (docId: string, turnId: string, question: string) => {
+  const runQuestion = async (k: string, docIds: string[], turnId: string, question: string) => {
     try {
-      const answer = await api.ask(docId, question);
-      updateTurn(docId, turnId, { state: "done", answer });
+      const answer = await api.askStream(docIds, question, {
+        onSources: (sources) => updateTurn(k, turnId, () => ({ liveSources: sources })),
+        onToken: (text) => updateTurn(k, turnId, (t) => ({ draft: (t.draft ?? "") + text })),
+      });
+      updateTurn(k, turnId, () => ({ state: "done", answer, draft: undefined, liveSources: undefined }));
     } catch (err) {
-      updateTurn(docId, turnId, { state: "error", error: message(err) });
+      updateTurn(k, turnId, () => ({ state: "error", error: message(err), draft: undefined, liveSources: undefined }));
     }
   };
 
   const ask = (question: string) => {
-    if (!activeId) return;
+    if (!selectedDocs.length) return;
+    const ids = selectedDocs.map((d) => d.doc_id);
     const turn: Turn = { id: crypto.randomUUID(), question, state: "pending" };
-    setThreads((all) => ({ ...all, [activeId]: [...(all[activeId] ?? []), turn] }));
-    void runQuestion(activeId, turn.id, question);
+    setThreads((all) => ({ ...all, [key]: [...(all[key] ?? []), turn] }));
+    void runQuestion(key, ids, turn.id, question);
   };
 
   const retry = (turn: Turn) => {
-    if (!activeId) return;
-    updateTurn(activeId, turn.id, { state: "pending", error: undefined });
-    void runQuestion(activeId, turn.id, turn.question);
+    if (!selectedDocs.length) return;
+    updateTurn(key, turn.id, () => ({ state: "pending", error: undefined }));
+    void runQuestion(key, selectedDocs.map((d) => d.doc_id), turn.id, turn.question);
   };
 
   const closeSource = useCallback(() => setOpenSource(null), []);
@@ -143,15 +167,12 @@ export function Workspace() {
     <Sidebar
       documents={documents}
       loading={docsLoading}
-      activeId={activeId}
+      selectedIds={selectedIds}
       upload={upload}
       health={health}
       serverDown={serverDown}
-      onSelect={(id) => {
-        setActiveId(id);
-        setOpenSource(null);
-        setDrawerOpen(false);
-      }}
+      onSelect={selectOnly}
+      onToggle={toggleSelected}
       onUpload={handleUpload}
       onDelete={handleDelete}
       onClose={onClose}
@@ -178,10 +199,14 @@ export function Workspace() {
             <LogoMark size={22} />
           </span>
           <div className="min-w-0">
-            <h1 className="truncate font-semibold">{activeDoc ? activeDoc.title || activeDoc.filename : "DocuMind AI"}</h1>
-            {activeDoc && (
+            <h1 className="truncate font-semibold">
+              {multiDoc ? `${selectedDocs.length} documents` : primaryDoc ? primaryDoc.title || primaryDoc.filename : "DocuMind AI"}
+            </h1>
+            {primaryDoc && (
               <p className="truncate text-xs text-graphite">
-                {activeDoc.page_count} pages, {activeDoc.chunk_count} indexed passages
+                {multiDoc
+                  ? selectedDocs.map((d) => d.filename).join(", ")
+                  : `${primaryDoc.page_count} pages, ${primaryDoc.chunk_count} indexed passages`}
               </p>
             )}
           </div>
@@ -199,7 +224,7 @@ export function Workspace() {
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
-            {!activeDoc ? (
+            {!primaryDoc ? (
               <Welcome
                 upload={upload}
                 onUpload={handleUpload}
@@ -209,11 +234,18 @@ export function Workspace() {
                 maxMb={maxUploadMb}
               />
             ) : turns.length === 0 ? (
-              <DocumentIntro doc={activeDoc} onAsk={ask} retrievalOnly={health?.llm_provider === "none"} />
+              <DocumentIntro docs={selectedDocs} onAsk={ask} retrievalOnly={health?.llm_provider === "none"} />
             ) : (
               <div className="space-y-10">
                 {turns.map((turn) => (
-                  <Message key={turn.id} turn={turn} activeChunk={openSource?.chunk_id ?? null} onOpenSource={setOpenSource} onRetry={() => retry(turn)} />
+                  <Message
+                    key={turn.id}
+                    turn={turn}
+                    multiDoc={multiDoc}
+                    activeChunk={openSource ? `${openSource.doc_id}:${openSource.chunk_id}` : null}
+                    onOpenSource={setOpenSource}
+                    onRetry={() => retry(turn)}
+                  />
                 ))}
                 <div ref={scrollEnd} />
               </div>
@@ -224,19 +256,23 @@ export function Workspace() {
         <div className="border-t border-line bg-ivory px-4 pb-4 pt-3 sm:px-6">
           <div className="mx-auto max-w-3xl">
             <Composer
-              disabled={!activeDoc || serverDown}
+              disabled={!primaryDoc || serverDown}
               busy={asking}
-              placeholder={activeDoc ? "Ask a question about this PDF" : "Upload a PDF to start asking questions"}
+              placeholder={
+                multiDoc ? "Ask a question across these PDFs" : primaryDoc ? "Ask a question about this PDF" : "Upload a PDF to start asking questions"
+              }
               onSubmit={ask}
             />
-            <p className="mt-2 text-center text-xs text-mute">Answers come only from the selected PDF. Check the cited page before relying on them.</p>
+            <p className="mt-2 text-center text-xs text-mute">
+              Answers come only from the selected {multiDoc ? "PDFs" : "PDF"}. Check the cited page before relying on them.
+            </p>
           </div>
         </div>
       </main>
 
-      {activeDoc && openSource && (
+      {sourceDoc && openSource && (
         <div className="fixed inset-0 z-50 xl:static xl:z-auto xl:w-[440px] xl:shrink-0">
-          <SourcePanel doc={activeDoc} source={openSource} onClose={closeSource} />
+          <SourcePanel doc={sourceDoc} source={openSource} onClose={closeSource} />
         </div>
       )}
     </div>
@@ -325,21 +361,39 @@ function ExamplePreview() {
   );
 }
 
-function DocumentIntro({ doc, onAsk, retrievalOnly }: { doc: DocumentInfo; onAsk: (q: string) => void; retrievalOnly: boolean }) {
-  const isSample = doc.filename === SAMPLE_FILENAME;
+function DocumentIntro({ docs, onAsk, retrievalOnly }: { docs: DocumentInfo[]; onAsk: (q: string) => void; retrievalOnly: boolean }) {
+  const single = docs.length === 1 ? docs[0] : null;
+  const isSample = single?.filename === SAMPLE_FILENAME;
+  const scanned = docs.filter((d) => d.image_only_pages.length > 0);
   return (
     <section className="pt-6 sm:pt-10">
       <h2 className="text-2xl font-semibold tracking-tight">What do you want to know?</h2>
-      <p className="mt-2 max-w-[60ch] text-graphite">
-        Ask about anything in <span className="font-medium text-ink">{doc.filename}</span>. Each answer links to the pages it
-        used; select a page number to see the passage highlighted.
-      </p>
-      {doc.image_only_pages.length > 0 && (
-        <p className="mt-4 rounded-xl bg-caution-wash px-4 py-3 text-sm text-caution">
-          {doc.image_only_pages.length === 1 ? "Page" : "Pages"} {doc.image_only_pages.join(", ")} look scanned and have no text
-          layer, so they can&apos;t be searched.
+      {single ? (
+        <p className="mt-2 max-w-[60ch] text-graphite">
+          Ask about anything in <span className="font-medium text-ink">{single.filename}</span>. Each answer links to the pages it
+          used; select a page number to see the passage highlighted. To search several PDFs at once, tick them in the sidebar.
         </p>
+      ) : (
+        <>
+          <p className="mt-2 max-w-[60ch] text-graphite">
+            Questions are answered from all {docs.length} selected documents. Each citation names the document and page it came from.
+          </p>
+          <ul className="mt-4 space-y-1 text-sm">
+            {docs.map((d) => (
+              <li key={d.doc_id} className="text-ink">
+                {d.filename} <span className="text-graphite">({d.page_count} pages)</span>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
+      {scanned.map((d) => (
+        <p key={d.doc_id} className="mt-4 rounded-xl bg-caution-wash px-4 py-3 text-sm text-caution">
+          {docs.length > 1 ? `${d.filename}: ` : ""}
+          {d.image_only_pages.length === 1 ? "Page" : "Pages"} {d.image_only_pages.join(", ")} look scanned and have no text layer, so
+          they can&apos;t be searched.
+        </p>
+      ))}
       {isSample && (
         <div className="mt-8">
           <h3 className="mb-3 text-sm font-medium text-graphite">Try one of these</h3>

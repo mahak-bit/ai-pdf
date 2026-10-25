@@ -2,23 +2,26 @@
 
 import { useState } from "react";
 import type { DocumentInfo, Health } from "@/lib/api";
-import { CloseIcon, DocIcon, LogoMark, TrashIcon } from "./icons";
+import { CloseIcon, LogoMark, TrashIcon } from "./icons";
 import { UploadDropzone, type UploadState } from "./UploadDropzone";
 
 type Props = {
   documents: DocumentInfo[];
   loading: boolean;
-  activeId: string | null;
+  selectedIds: string[];
   upload: UploadState;
   health: Health | null;
   serverDown: boolean;
+  /** Make this the only selected document. */
   onSelect: (docId: string) => void;
+  /** Add or remove a document from a multi-document selection. */
+  onToggle: (docId: string) => void;
   onUpload: (file: File) => void;
   onDelete: (docId: string) => void;
   onClose?: () => void;
 };
 
-export function Sidebar({ documents, loading, activeId, upload, health, serverDown, onSelect, onUpload, onDelete, onClose }: Props) {
+export function Sidebar({ documents, loading, selectedIds, upload, health, serverDown, onSelect, onToggle, onUpload, onDelete, onClose }: Props) {
   const [confirming, setConfirming] = useState<string | null>(null);
 
   return (
@@ -39,26 +42,33 @@ export function Sidebar({ documents, loading, activeId, upload, health, serverDo
         <UploadDropzone compact state={upload} onFile={onUpload} />
       </div>
 
-      <h2 className="px-5 pb-2 pt-6 text-sm font-medium text-graphite">Your documents</h2>
+      <h2 className="px-5 pt-6 text-sm font-medium text-graphite">Your documents</h2>
+      <p className="px-5 pb-2 text-xs text-mute">{documents.length > 1 ? "Tick several to ask across them." : " "}</p>
       <ul className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2.5 pb-4">
         {loading && <li className="px-2.5 py-2 text-sm text-mute">Loading…</li>}
         {!loading && documents.length === 0 && (
           <li className="px-2.5 py-2 text-sm text-mute">Nothing uploaded yet.</li>
         )}
         {documents.map((doc) => {
-          const active = doc.doc_id === activeId;
+          const active = selectedIds.includes(doc.doc_id);
           return (
             <li key={doc.doc_id} className="group relative">
+              <input
+                type="checkbox"
+                checked={active}
+                onChange={() => onToggle(doc.doc_id)}
+                aria-label={`Include ${doc.filename} in questions`}
+                className="absolute left-3 top-3 z-10 size-4 cursor-pointer accent-[var(--color-blue)]"
+              />
               <button
                 type="button"
                 onClick={() => onSelect(doc.doc_id)}
                 aria-current={active ? "true" : undefined}
                 className={[
-                  "flex w-full items-start gap-2.5 rounded-lg py-2 pl-2.5 pr-9 text-left transition-colors",
+                  "flex w-full items-start gap-2.5 rounded-lg py-2 pl-9 pr-9 text-left transition-colors",
                   active ? "bg-paper shadow-[inset_0_0_0_1px_var(--color-line)]" : "hover:bg-line/40",
                 ].join(" ")}
               >
-                <DocIcon size={17} className={`mt-0.5 shrink-0 ${active ? "text-blue" : "text-mute"}`} />
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium">{doc.filename}</span>
                   <span className="block text-xs text-graphite">

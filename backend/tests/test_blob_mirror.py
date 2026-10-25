@@ -35,6 +35,14 @@ class InMemoryMirror:
         for key in [k for k in self.objects if k.startswith(f"{doc_id}/")]:
             del self.objects[key]
 
+    def read_upload(self, pathname):
+        if pathname not in self.objects:
+            raise FileNotFoundError(pathname)
+        return self.objects[pathname]
+
+    def delete_upload(self, pathname):
+        self.objects.pop(pathname, None)
+
 
 def _instance(tmp_path: Path, name: str, embedder, mirror) -> TestClient:
     settings = Settings(_env_file=None, data_dir=tmp_path / name, llm_provider="none", min_relevance=0.05)
@@ -65,6 +73,7 @@ def test_health_reports_storage_and_upload_limit(tmp_path, embedder):
     blob = _instance(tmp_path, "blob", embedder, InMemoryMirror()).get("/api/health").json()
     local = _instance(tmp_path, "local", embedder, None).get("/api/health").json()
     assert blob["storage"] == "blob" and local["storage"] == "local"
+    assert blob["direct_upload"] is True and local["direct_upload"] is False
     assert local["max_upload_mb"] == 20
 
 
@@ -100,3 +109,38 @@ def test_resolve_model_path_prefers_baked_copy(tmp_path):
     (tmp_path / "all-MiniLM-L6-v2").mkdir()
     (tmp_path / "all-MiniLM-L6-v2" / "config.json").write_text("{}")
     assert resolve_model_path(name, tmp_path) == str(tmp_path / "all-MiniLM-L6-v2")
+
+
+UPLOAD = "uploads/0b6c1f0e-3f7a-4c55-9d62-2f4e8f3c1a77.pdf"
+
+
+def test_ingest_from_blob_upload_then_deletes_it(tmp_path, embedder, handbook_pdf):
+    mirror = InMemoryMirror()
+    mirror.objects[UPLOAD] = handbook_pdf
+    client = _instance(tmp_path, "d", embedder, mirror)
+    response = client.post("/api/documents/from-blob", json={"pathname": UPLOAD, "filename": "big-report.pdf"})
+    assert response.status_code == 201
+    assert response.json()["filename"] == "big-report.pdf"
+    assert UPLOAD not in mirror.objects
+
+
+def test_ingest_from_blob_validates_and_cleans_up(tmp_path, embedder):
+    mirror = InMemoryMirror()
+    mirror.objects[UPLOAD] = b"not a pdf at all"
+    client = _instance(tmp_path, "e", embedder, mirror)
+    response = client.post("/api/documents/from-blob", json={"pathname": UPLOAD, "filename": "x.pdf"})
+    assert response.status_code == 400
+    assert UPLOAD not in mirror.objects  # rejected uploads are deleted too
+
+
+def test_ingest_from_blob_rejects_paths_outside_uploads(tmp_path, embedder):
+    client = _instance(tmp_path, "f", embedder, InMemoryMirror())
+    for path in ("documents/abc/source.pdf", "uploads/../documents/x.pdf", "uploads/evil.pdf"):
+        assert client.post("/api/documents/from-blob", json={"pathname": path, "filename": "x.pdf"}).status_code == 422
+
+
+def test_ingest_from_blob_missing_upload_and_disabled_mirror(tmp_path, embedder):
+    with_mirror = _instance(tmp_path, "g", embedder, InMemoryMirror())
+    assert with_mirror.post("/api/documents/from-blob", json={"pathname": UPLOAD, "filename": "x.pdf"}).status_code == 404
+    without = _instance(tmp_path, "h", embedder, None)
+    assert without.post("/api/documents/from-blob", json={"pathname": UPLOAD, "filename": "x.pdf"}).status_code == 404

@@ -1,5 +1,6 @@
 """FastAPI application: routes, error handling and wiring."""
 
+import json
 import logging
 import threading
 from contextlib import asynccontextmanager
@@ -10,7 +11,7 @@ from typing import Annotated
 from fastapi import FastAPI, File, Path as PathParam, Query, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .config import BACKEND_ROOT, Settings, get_settings
@@ -21,8 +22,8 @@ from .errors import AppError, NotFound
 from .llm import LLMClient, build_llm_client
 from .page_render import render_page_png
 from .pdf_parser import validate_upload
-from .rag import RAGPipeline
-from .schemas import AnswerOut, AskRequest, DocumentOut, ErrorOut, HealthOut
+from .rag import RAGPipeline, SearchDoc
+from .schemas import AnswerOut, AskRequest, DocumentOut, ErrorOut, FromBlobRequest, HealthOut, MultiAskRequest
 
 log = logging.getLogger("documind")
 
@@ -114,8 +115,9 @@ def create_app(
             embedding_model=settings.embedding_model,
             embedding_model_loaded=bool(getattr(embedder, "loaded", True)),
             documents=len(store.list()),
-            max_upload_mb=settings.max_upload_mb,
+            max_upload_mb=settings.max_direct_upload_mb if store.mirror else settings.max_upload_mb,
             storage="blob" if store.mirror else "local",
+            direct_upload=bool(store.mirror),
         )
 
     @app.get("/api/documents", response_model=list[DocumentOut])
@@ -148,10 +150,46 @@ def create_app(
         store.delete(doc_id)
         return Response(status_code=204)
 
+    @app.post("/api/documents/from-blob", response_model=DocumentOut, status_code=201)
+    def ingest_from_blob(body: FromBlobRequest):
+        """Ingest a PDF the browser uploaded straight to Blob storage (bypasses the
+        platform's request-size cap). The temporary upload is deleted afterwards."""
+        if not store.mirror:
+            raise NotFound("Direct uploads are not enabled on this server.")
+        try:
+            data = store.mirror.read_upload(body.pathname)
+        except FileNotFoundError as exc:
+            raise NotFound("The uploaded file was not found. Upload it again.") from exc
+        try:
+            validate_upload(body.filename, data, settings.max_direct_upload_mb * 1024 * 1024)
+            return asdict(store.ingest(body.filename, data, settings.max_pages))
+        finally:
+            store.mirror.delete_upload(body.pathname)
+
+    def search_docs(doc_ids: list[str]) -> list[SearchDoc]:
+        docs = [store.get(doc_id) for doc_id in dict.fromkeys(doc_ids)]
+        return [SearchDoc(d.meta.doc_id, d.meta.filename, d.index) for d in docs]
+
     @app.post("/api/documents/{doc_id}/ask", response_model=AnswerOut)
     def ask(doc_id: DocId, body: AskRequest):
-        doc = store.get(doc_id)
-        return asdict(pipeline.answer(doc.index, body.question))
+        return asdict(pipeline.answer(search_docs([doc_id]), body.question))
+
+    @app.post("/api/ask", response_model=AnswerOut)
+    def ask_many(body: MultiAskRequest):
+        return asdict(pipeline.answer(search_docs(body.doc_ids), body.question))
+
+    @app.post("/api/ask/stream", response_class=StreamingResponse)
+    def ask_stream(body: MultiAskRequest):
+        """Server-sent events: `sources`, then `token`s, then `final` (or `error`)."""
+        docs = search_docs(body.doc_ids)  # unknown ids fail here, as a normal JSON 404
+
+        def events():
+            for event, data in pipeline.answer_stream(docs, body.question):
+                yield f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+        return StreamingResponse(
+            events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+        )
 
     @app.get("/api/documents/{doc_id}/pages/{page}", response_class=Response)
     def page_image(

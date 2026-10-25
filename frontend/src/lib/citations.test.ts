@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Source } from "./api";
 import { pageLabel, segmentAnswer, shorten } from "./citations";
 
-const src = (id: string, page: number): Source => ({ source_id: id, chunk_id: `p${page}-c0`, page, excerpt: "x", score: 0.5 });
+const src = (id: string, page: number): Source => ({ source_id: id, chunk_id: `p${page}-c0`, page, excerpt: "x", score: 0.5, doc_id: "aaaaaaaaaaaa", filename: "a.pdf" });
 
 describe("segmentAnswer", () => {
   it("turns markers into citation segments tied to their source", () => {

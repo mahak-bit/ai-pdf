@@ -19,15 +19,18 @@ class Settings(BaseSettings):
     # reachable, otherwise retrieval-only mode (passages are shown, no answer is generated).
     llm_provider: Literal["auto", "gemini", "ollama", "none"] = "auto"
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-3.1-flash-lite"
+    gemini_model: str = "gemini-3.5-flash-lite"
+    # Tried in order when the main model is overloaded, rate-limited or out of daily quota.
+    gemini_fallback_models: str = "gemini-3.1-flash-lite,gemini-flash-lite-latest"
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.2:3b"
-    llm_timeout_seconds: float = 60.0
+    llm_timeout_seconds: float = 30.0
 
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
 
     data_dir: Path = BACKEND_ROOT / "data"
-    max_upload_mb: int = 20
+    max_upload_mb: int = 20  # through the API (capped at 4 MB on Vercel)
+    max_direct_upload_mb: int = 20  # browser-to-Blob uploads, when Blob storage is enabled
     max_pages: int = 500
 
     # Chunking: page-scoped, sentence-packed windows. ~600 chars is ~130 tokens, close to

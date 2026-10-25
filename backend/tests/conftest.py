@@ -53,8 +53,10 @@ class ScriptedLLM:
         self.reply = reply
         self.prompts: list[str] = []
 
-    def generate_json(self, system: str, prompt: str) -> str:
+    def generate_json(self, system: str, prompt: str, on_model=None) -> str:
         self.prompts.append(prompt)
+        if on_model:
+            on_model(self.model)
         if isinstance(self.reply, Exception):
             raise self.reply
         if isinstance(self.reply, str):
@@ -65,6 +67,21 @@ class ScriptedLLM:
         first = re.search(r"\[(S\d+)\]", prompt)
         sid = first.group(1) if first else "S1"
         return json.dumps({"answerable": True, "answer": f"Per the document [{sid}].", "citations": [sid]})
+
+    def stream_text(self, system: str, prompt: str, on_model=None):
+        """Plain-text mode: `reply` is the full text (or an exception); yielded in small pieces."""
+        self.prompts.append(prompt)
+        if on_model:
+            on_model(self.model)
+        if isinstance(self.reply, Exception):
+            raise self.reply
+        if isinstance(self.reply, str):
+            text = self.reply
+        else:
+            first = re.search(r"\[(S\d+)\]", prompt)
+            text = f"Per the document [{first.group(1) if first else 'S1'}]."
+        for start in range(0, len(text), 4):
+            yield text[start : start + 4]
 
 
 def make_pdf(pages: list[str]) -> bytes:

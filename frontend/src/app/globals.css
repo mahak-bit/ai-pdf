@@ -82,9 +82,18 @@ body {
   animation: panel-in 180ms ease-out;
 }
 
+@keyframes caret-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
+.stream-caret {
+  animation: caret-blink 1s step-end infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .thinking-dot,
-  .panel-in {
+  .panel-in,
+  .stream-caret {
     animation: none;
   }
 }

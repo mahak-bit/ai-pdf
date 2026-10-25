@@ -30,7 +30,7 @@ from app.config import get_settings  # noqa: E402
 from app.embeddings import SentenceTransformerEmbedder  # noqa: E402
 from app.llm import build_llm_client  # noqa: E402
 from app.pdf_parser import extract_pages  # noqa: E402
-from app.rag import RAGPipeline  # noqa: E402
+from app.rag import RAGPipeline, SearchDoc  # noqa: E402
 from app.vector_store import DocumentIndex  # noqa: E402
 
 
@@ -106,7 +106,7 @@ def main() -> None:
                 if i and args.delay:
                     time.sleep(args.delay)
                 try:
-                    result = pipeline.answer(index, r["question"])
+                    result = pipeline.answer([SearchDoc("eval00000000", spec["document"], index)], r["question"])
                 except Exception as exc:  # report and keep going
                     r.update(status="error", error=str(exc))
                     continue

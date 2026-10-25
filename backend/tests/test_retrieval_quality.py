@@ -10,7 +10,7 @@ from app.config import Settings
 from app.embeddings import SentenceTransformerEmbedder
 from app.main import SAMPLE_PDF
 from app.pdf_parser import extract_pages
-from app.rag import RAGPipeline
+from app.rag import RAGPipeline, SearchDoc
 from app.vector_store import DocumentIndex
 
 pytestmark = pytest.mark.model
@@ -23,7 +23,7 @@ def pipeline_and_index():
     parsed = extract_pages(SAMPLE_PDF.read_bytes(), max_pages=50)
     chunks = chunk_pages(parsed.pages, settings.chunk_max_chars, settings.chunk_overlap_chars)
     index = DocumentIndex.build(chunks, embedder.embed([c.text for c in chunks]))
-    return RAGPipeline(embedder, None, settings.top_k, settings.min_relevance), index
+    return RAGPipeline(embedder, None, settings.top_k, settings.min_relevance), [SearchDoc("sample000000", SAMPLE_PDF.name, index)]
 
 
 @pytest.mark.parametrize(
@@ -40,7 +40,7 @@ def test_expected_page_is_top_ranked(pipeline_and_index, question, page):
     pipeline, index = pipeline_and_index
     hits = pipeline.retrieve(index, question)
     assert hits, "expected at least one passage above the relevance floor"
-    assert hits[0].chunk.page == page
+    assert hits[0].page == page
 
 
 @pytest.mark.parametrize(
