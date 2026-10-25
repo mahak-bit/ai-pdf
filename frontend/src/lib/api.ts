@@ -110,6 +110,9 @@ export const api = {
         }
         if (xhr.status >= 200 && xhr.status < 300 && body) return resolve(body as DocumentInfo);
         const err = (body as { error?: { message?: string; code?: string } } | null)?.error;
+        // Hosting platforms may reject large bodies before the API sees them (plain-text 413).
+        if (!err && xhr.status === 413)
+          return reject(new ApiError("That file is larger than the server's upload limit.", "file_too_large", 413));
         reject(
           new ApiError(
             err?.message ?? `Upload failed (HTTP ${xhr.status}).`,
